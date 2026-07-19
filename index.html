@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Video Creator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="accent-line"></div>
+            <div class="title-row">
+                <h1>TikTok Video Creator</h1>
+                <span class="version">v2.0</span>
+            </div>
+            <p class="subtitle">Vídeos verticais com voz TTS, overlays e legendas sincronizadas</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Video Selection Section -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>VÍDEO DE FUNDO</h2>
+                </div>
+                <div class="card-content">
+                    <div class="video-row">
+                        <button class="btn btn-secondary-outline" id="btn-video">
+                            Escolher Vídeo
+                        </button>
+                        <input type="file" id="video-input" accept="video/*" style="display: none;">
+                        <span class="video-label" id="video-label">Nenhum vídeo selecionado</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Text Section -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>TEXTO</h2>
+                </div>
+                <div class="card-content">
+                    <!-- Author + Avatar Row -->
+                    <div class="auth-row">
+                        <label class="auth-label">Autor:</label>
+                        <input type="text" class="input-field" id="author-input" value="Respira Reddit">
+                        <button class="btn btn-secondary-outline btn-small" id="btn-avatar">Avatar</button>
+                        <input type="file" id="avatar-input" accept="image/*" style="display: none;">
+                        <span class="avatar-label" id="avatar-label">Padrão</span>
+                        <button class="btn btn-danger-outline btn-tiny" id="btn-avatar-clear">✕</button>
+                    </div>
+
+                    <!-- Intro Text -->
+                    <label class="text-label">Título / Introdução</label>
+                    <textarea class="text-area" id="intro-input" rows="2" placeholder="Título / Introdução">Minha banhista de cachorro me ligou e perguntou Por que seu cachorro responde a comandos em um idioma que você afirma não falar?</textarea>
+
+                    <!-- Body Text -->
+                    <label class="text-label">Corpo / Legendas</label>
+                    <textarea class="text-area" id="body-input" rows="3" placeholder="Corpo / Legendas">Eu fiquei em silêncio por um momento, sem saber o que dizer. Como eu iria explicar para ela que o meu cachorro tinha sido treinado por um agente secreto?</textarea>
+
+                    <!-- Character Counter -->
+                    <div class="char-counter" id="char-counter">0 caracteres (Card: 0, Legendas: 0)</div>
+                </div>
+            </section>
+
+            <!-- Voice Section -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>VOZ</h2>
+                </div>
+                <div class="card-content">
+                    <div class="voice-buttons">
+                        <label class="radio-label">
+                            <input type="radio" name="voice" value="male" checked>
+                            <span class="radio-btn">Masculina</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="voice" value="female">
+                            <span class="radio-btn">Feminina</span>
+                        </label>
+                    </div>
+                    <div class="speed-row">
+                        <label class="speed-label" id="speed-label">Velocidade (+60%):</label>
+                        <input type="range" class="slider" id="speed-slider" min="-50" max="100" value="60">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Subtitles & Performance Section -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>LEGENDAS & PERFORMANCE</h2>
+                </div>
+                <div class="card-content">
+                    <div class="grid-layout">
+                        <!-- Column 1 -->
+                        <div class="grid-col">
+                            <div class="setting-row">
+                                <label class="setting-label">Palavras/legenda:</label>
+                                <select class="select-field" id="words-select">
+                                    <option value="1">1</option>
+                                    <option value="2" selected>2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label class="setting-label">Cor destaque:</label>
+                                <select class="select-field" id="color-select">
+                                    <option value="Amarelo Néon" selected>Amarelo Néon</option>
+                                    <option value="Verde Néon">Verde Néon</option>
+                                    <option value="Ciano Néon">Ciano Néon</option>
+                                    <option value="Rosa Néon">Rosa Néon</option>
+                                    <option value="Branco (Sem Destaque)">Branco (Sem Destaque)</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label class="setting-label">Animação saída:</label>
+                                <select class="select-field" id="anim-select">
+                                    <option value="Deslizar para Baixo" selected>Deslizar para Baixo</option>
+                                    <option value="Deslizar para Cima">Deslizar para Cima</option>
+                                    <option value="Deslizar para a Esquerda">Deslizar para a Esquerda</option>
+                                    <option value="Deslizar para a Direita">Deslizar para a Direita</option>
+                                    <option value="Desaparecer (Fade Out)">Desaparecer (Fade Out)</option>
+                                    <option value="Nenhuma (Corte Seco)">Nenhuma (Corte Seco)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Column 2 -->
+                        <div class="grid-col">
+                            <label class="slider-label" id="size-label">Fonte (116):</label>
+                            <input type="range" class="slider" id="size-slider" min="40" max="120" value="116">
+
+                            <label class="slider-label" id="pos-label">Posição Y (960):</label>
+                            <input type="range" class="slider" id="pos-slider" min="960" max="1600" value="960">
+
+                            <div class="gpu-row">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="gpu-checkbox" checked>
+                                    <span class="checkbox-text">Aceleração GPU</span>
+                                </label>
+                            </div>
+                            <div class="encoder-label" id="encoder-label">GPU: Detectando...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Generate Button -->
+            <div class="btn-container">
+                <button class="btn btn-primary btn-large" id="generate-btn">GERAR VÍDEO</button>
+            </div>
+
+            <!-- Progress Section -->
+            <section class="progress-section">
+                <div class="status-row">
+                    <span class="status-label" id="status-label">Pronto</span>
+                    <span class="percent-label" id="percent-label">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="separator"></div>
+                <p>TikTok Video Creator v2.0</p>
+            </footer>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
