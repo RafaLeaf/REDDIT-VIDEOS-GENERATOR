@@ -116,6 +116,12 @@ def _get_assets_dir():
 def _load_badge_images(badge_size=36):
     """Load badge images from BADGES/ directory and resize them."""
     badges_dir = _get_assets_dir()
+    
+    # First check if directory exists
+    if not os.path.isdir(badges_dir):
+        print(f"Badges directory not found: {badges_dir}")
+        return []
+    
     badge_files = [
         'Captura_de_ecrã_2026-07-05_213146-removebg-preview.png',
         'Captura_de_ecrã_2026-07-05_213152-removebg-preview.png',
@@ -136,8 +142,15 @@ def _load_badge_images(badge_size=36):
                 badge = Image.open(fpath).convert("RGBA")
                 badge = badge.resize((badge_size, badge_size), resample)
                 loaded.append(badge)
-            except Exception:
-                pass
+                print(f"Loaded badge: {fname}")
+            except Exception as e:
+                print(f"Error loading badge {fname}: {e}")
+        else:
+            print(f"Badge file not found: {fpath}")
+    
+    if not loaded:
+        print(f"No badges loaded from {badges_dir}")
+    
     return loaded
 
 def _draw_smooth_shadow(base_img, rect, radius, shadow_color=(0, 0, 0, 40), offset=(0, 6), blur_passes=5):
@@ -158,16 +171,49 @@ def _draw_smooth_shadow(base_img, rect, radius, shadow_color=(0, 0, 0, 40), offs
 
 def create_reddit_card(author_name, intro_text, output_path, avatar_path=None):
     """Generate a Reddit post card PNG image."""
-    SCALE = 2
+    SCALE = 1  # Reduced from 2 to 1 for faster processing
 
-    try:
-        font_author = ImageFont.truetype("arialbd.ttf", 36 * SCALE)
-        font_text   = ImageFont.truetype("arialbd.ttf", 38 * SCALE)
-        font_small  = ImageFont.truetype("arial.ttf", 24 * SCALE)
-    except IOError:
+    # Try multiple font options for better compatibility
+    font_author = None
+    font_text = None
+    font_small = None
+    
+    font_options = [
+        "arialbd.ttf", "Arial Bold.ttf", "arialbd", "Arial",
+        "DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/Windows/Fonts/arialbd.ttf"
+    ]
+    
+    for font_name in font_options:
+        try:
+            font_author = ImageFont.truetype(font_name, 36 * SCALE)
+            font_text = ImageFont.truetype(font_name, 38 * SCALE)
+            break
+        except (IOError, OSError):
+            continue
+    
+    font_options_small = [
+        "arial.ttf", "Arial.ttf", "arial", "Arial",
+        "DejaVuSans.ttf", "LiberationSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/Windows/Fonts/arial.ttf"
+    ]
+    
+    for font_name in font_options_small:
+        try:
+            font_small = ImageFont.truetype(font_name, 24 * SCALE)
+            break
+        except (IOError, OSError):
+            continue
+    
+    # Fallback to default font if none found
+    if font_author is None:
         font_author = ImageFont.load_default()
-        font_text   = ImageFont.load_default()
-        font_small  = ImageFont.load_default()
+    if font_text is None:
+        font_text = ImageFont.load_default()
+    if font_small is None:
+        font_small = ImageFont.load_default()
 
     try:
         resample_filter = Image.Resampling.LANCZOS
@@ -522,6 +568,13 @@ class VideoProcessor:
 
         duration = self._probe_duration(audio_path)
         fps_str = self._probe_video_fps(video_path)
+        
+        # Limit duration to prevent very long processing times
+        max_duration = 300  # 5 minutes max
+        if duration > max_duration:
+            duration = max_duration
+            if progress_cb:
+                progress_cb(f"⚠️ Duração limitada a {max_duration}s para processamento", 40)
 
         ass_dir = os.path.dirname(ass_path)
         ass_filename = os.path.basename(ass_path)
@@ -589,18 +642,18 @@ class VideoProcessor:
             filter_args = ["-vf", vf, "-map", "0:v:0", "-map", "1:a:0"]
 
         encoder = "libx264"
-        enc_args = ["-preset", "ultrafast", "-crf", "23"]
+        enc_args = ["-preset", "ultrafast", "-crf", "28"]  # Increased CRF for faster encoding
 
         if config.get("use_gpu", True):
             detected = get_best_h264_encoder()
             if detected != "libx264":
                 encoder = detected
                 if encoder == "h264_nvenc":
-                    enc_args = ["-rc", "vbr", "-cq", "23", "-preset", "p4"]
+                    enc_args = ["-rc", "vbr", "-cq", "28", "-preset", "p1"]  # Faster preset
                 elif encoder == "h264_amf":
-                    enc_args = ["-rc", "cqp", "-qp_i", "23", "-qp_p", "23"]
+                    enc_args = ["-rc", "cqp", "-qp_i", "28", "-qp_p", "28"]  # Higher quality for speed
                 elif encoder == "h264_qsv":
-                    enc_args = ["-global_quality", "23"]
+                    enc_args = ["-global_quality", "28"]
                 elif encoder == "h264_mf":
                     enc_args = []
 
