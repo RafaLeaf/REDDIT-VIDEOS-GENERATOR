@@ -592,8 +592,8 @@ class VideoProcessor:
         duration = self._probe_duration(audio_path)
         fps_str = self._probe_video_fps(video_path)
         
-        # Limit duration to prevent very long processing times (cloud environments)
-        max_duration = 180  # 3 minutes max for cloud
+        # Very aggressive duration limit for cloud environments
+        max_duration = 90  # 1.5 minutes max
         if duration > max_duration:
             duration = max_duration
             if progress_cb:
@@ -665,7 +665,8 @@ class VideoProcessor:
             filter_args = ["-vf", vf, "-map", "0:v:0", "-map", "1:a:0"]
 
         encoder = "libx264"
-        enc_args = ["-preset", "ultrafast", "-crf", "30"]  # Even higher CRF for faster encoding on cloud
+        # Maximum speed settings for cloud
+        enc_args = ["-preset", "ultrafast", "-crf", "40", "-tune", "fastdecode", "-threads", "4"]
 
         # Disable GPU on cloud environments for stability
         if config.get("use_gpu", True):
@@ -673,13 +674,13 @@ class VideoProcessor:
             if detected != "libx264":
                 encoder = detected
                 if encoder == "h264_nvenc":
-                    enc_args = ["-rc", "vbr", "-cq", "30", "-preset", "p1"]  # Faster preset
+                    enc_args = ["-rc", "vbr", "-cq", "40", "-preset", "p1", "-threads", "4"]
                 elif encoder == "h264_amf":
-                    enc_args = ["-rc", "cqp", "-qp_i", "30", "-qp_p", "30"]  # Higher quality for speed
+                    enc_args = ["-rc", "cqp", "-qp_i", "40", "-qp_p", "40", "-threads", "4"]
                 elif encoder == "h264_qsv":
-                    enc_args = ["-global_quality", "30"]
+                    enc_args = ["-global_quality", "40", "-threads", "4"]
                 elif encoder == "h264_mf":
-                    enc_args = []
+                    enc_args = ["-threads", "4"]
 
         cmd = [
             FFMPEG_PATH, "-y",
@@ -689,7 +690,7 @@ class VideoProcessor:
             "-c:v", encoder,
         ] + enc_args + [
             "-c:a", "aac",
-            "-b:a", "192k",
+            "-b:a", "128k",  # Reduced audio bitrate for speed
             "-movflags", "+faststart",
             "-pix_fmt", "yuv420p",
             output_path,
@@ -788,6 +789,9 @@ def detect_gpu():
 @app.route('/api/generate', methods=['POST'])
 def generate_video():
     """Generate TikTok video with TTS, subtitles, and overlays."""
+    import time
+    start_time = time.time()
+    
     try:
         # Check for required files
         if 'video' not in request.files:
@@ -810,33 +814,42 @@ def generate_video():
         anim_type = request.form.get('anim_type', 'Deslizar para Baixo')
         voice_rate = request.form.get('voice_rate', '+60%')
         
+        print(f"[DEBUG] Starting video generation - Intro: {len(intro)} chars, Body: {len(body)} chars")
+        
         # Handle avatar file
         avatar_path = None
         if 'avatar' in request.files and request.files['avatar'].filename:
             avatar_file = request.files['avatar']
             avatar_path = os.path.join(tempfile.gettempdir(), secure_filename(avatar_file.filename))
             avatar_file.save(avatar_path)
+            print(f"[DEBUG] Avatar saved to: {avatar_path}")
         
         # Create temporary directory for processing
         tmp_dir = tempfile.mkdtemp(prefix="tiktok_creator_")
+        print(f"[DEBUG] Temp directory: {tmp_dir}")
         
         # Save video file
         video_path = os.path.join(tmp_dir, secure_filename(video_file.filename))
         video_file.save(video_path)
+        print(f"[DEBUG] Video saved to: {video_path}")
         
         # Progress callback (we'll use a simple list to track progress)
         progress = [0]
         
         def progress_cb(msg, val):
             progress[0] = val
+            print(f"[DEBUG] Progress: {msg} ({val}%)")
         
         # Generate card if intro text exists
         card_path = None
         if intro:
+            card_start = time.time()
             card_path = os.path.join(tmp_dir, "reddit_card.png")
             create_reddit_card(author, intro, card_path, avatar_path=avatar_path)
+            print(f"[DEBUG] Card generated in {time.time() - card_start:.2f}s")
         
         # Generate TTS and subtitles
+        tts_start = time.time()
         tts = TTSEngine()
         audio_path, ass_path, intro_duration = asyncio.run(
             tts.generate(intro, body, voice_type, tmp_dir, {
@@ -847,19 +860,28 @@ def generate_video():
                 'position_y': position_y
             }, progress_cb)
         )
+        print(f"[DEBUG] TTS generated in {time.time() - tts_start:.2f}s, intro_duration: {intro_duration}")
         
         # Process video
+        video_start = time.time()
         output_path = os.path.join(tmp_dir, "output.mp4")
         proc = VideoProcessor()
         proc.process(video_path, audio_path, ass_path, card_path, intro_duration, output_path, {
             'use_gpu': use_gpu,
             'anim_type': anim_type
         }, progress_cb)
+        print(f"[DEBUG] Video processed in {time.time() - video_start:.2f}s")
+        
+        total_time = time.time() - start_time
+        print(f"[DEBUG] Total generation time: {total_time:.2f}s")
         
         # Send the file
         return send_file(output_path, as_attachment=True, download_name='tiktok_video.mp4')
         
     except Exception as e:
+        print(f"[ERROR] Generation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
     finally:
         # Cleanup temporary directory
