@@ -60,6 +60,15 @@ def get_best_h264_encoder():
     if BEST_ENCODER is not None:
         return BEST_ENCODER
 
+    # Check if we're in a cloud environment (Render, etc.) - skip GPU detection
+    # Cloud environments typically don't have GPU access
+    cloud_indicators = ['RENDER', 'HEROKU', 'AWS', 'GCP', 'AZURE']
+    for indicator in cloud_indicators:
+        if indicator in os.environ:
+            print(f"Cloud environment detected ({indicator}), using CPU encoder")
+            BEST_ENCODER = "libx264"
+            return BEST_ENCODER
+
     encoders = ["h264_nvenc", "h264_amf", "h264_qsv", "h264_mf", "libx264"]
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     for enc in encoders:
@@ -74,7 +83,7 @@ def get_best_h264_encoder():
                 "-c:v", enc,
                 "-f", "null", "-"
             ]
-            proc = subprocess.run(cmd, capture_output=True, creationflags=flags)
+            proc = subprocess.run(cmd, capture_output=True, creationflags=flags, timeout=10)
             if proc.returncode == 0:
                 BEST_ENCODER = enc
                 return BEST_ENCODER
@@ -111,6 +120,20 @@ def _get_assets_dir():
     """Get the assets directory, handling both development and PyInstaller bundle."""
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, 'BADGES')
+    
+    # Try multiple possible locations for BADGES folder
+    possible_paths = [
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'BADGES'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'BADGES'),
+        'BADGES',
+        './BADGES'
+    ]
+    
+    for path in possible_paths:
+        if os.path.isdir(path):
+            return path
+    
+    # Fallback to original path
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'BADGES')
 
 def _load_badge_images(badge_size=36):
@@ -569,8 +592,8 @@ class VideoProcessor:
         duration = self._probe_duration(audio_path)
         fps_str = self._probe_video_fps(video_path)
         
-        # Limit duration to prevent very long processing times
-        max_duration = 300  # 5 minutes max
+        # Limit duration to prevent very long processing times (cloud environments)
+        max_duration = 180  # 3 minutes max for cloud
         if duration > max_duration:
             duration = max_duration
             if progress_cb:
@@ -642,18 +665,19 @@ class VideoProcessor:
             filter_args = ["-vf", vf, "-map", "0:v:0", "-map", "1:a:0"]
 
         encoder = "libx264"
-        enc_args = ["-preset", "ultrafast", "-crf", "28"]  # Increased CRF for faster encoding
+        enc_args = ["-preset", "ultrafast", "-crf", "30"]  # Even higher CRF for faster encoding on cloud
 
+        # Disable GPU on cloud environments for stability
         if config.get("use_gpu", True):
             detected = get_best_h264_encoder()
             if detected != "libx264":
                 encoder = detected
                 if encoder == "h264_nvenc":
-                    enc_args = ["-rc", "vbr", "-cq", "28", "-preset", "p1"]  # Faster preset
+                    enc_args = ["-rc", "vbr", "-cq", "30", "-preset", "p1"]  # Faster preset
                 elif encoder == "h264_amf":
-                    enc_args = ["-rc", "cqp", "-qp_i", "28", "-qp_p", "28"]  # Higher quality for speed
+                    enc_args = ["-rc", "cqp", "-qp_i", "30", "-qp_p", "30"]  # Higher quality for speed
                 elif encoder == "h264_qsv":
-                    enc_args = ["-global_quality", "28"]
+                    enc_args = ["-global_quality", "30"]
                 elif encoder == "h264_mf":
                     enc_args = []
 
